@@ -2,7 +2,6 @@ import os
 import math
 import yaml
 import numpy as np
-import wandb
 import cv2
 import torch
 import carla
@@ -75,8 +74,6 @@ class LAVAgent(AutonomousAgent):
 
         self.waypointer = None
         self.planner    = None
-
-        wandb.init(project='lav_eval')
 
         # Setup models
         self.lidar_model = LiDARModel(
@@ -158,11 +155,6 @@ class LAVAgent(AutonomousAgent):
         self.lane_changed = None
 
     def flush_data(self):
-
-        if self.log_wandb:
-            wandb.log({
-                'vid': wandb.Video(np.stack(self.vizs).transpose((0,3,1,2)), fps=20, format='mp4')
-            })
 
         self.vizs.clear()
 
