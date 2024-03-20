@@ -329,7 +329,7 @@ class LAVAgent(AutonomousAgent):
 
         self.ekf.step(spd, steer, *gps[:2], compass-math.pi/2)
 
-        if float(pred_bra) > 0.1:
+        if float(pred_bra) > 1:
             throt, brake = 0, 1
         elif self.plan_collide(ego_plan_locs, other_cast_locs, other_cast_cmds):
             throt, brake = 0, 1
@@ -401,6 +401,7 @@ class LAVAgent(AutonomousAgent):
         # desired_speed = np.linalg.norm(waypoints[1:]-waypoints[:-1], axis=1).mean()
         # desired_speed = np.mean((waypoints[1:]-waypoints[:-1])@[0,1])
         desired_speed = np.linalg.norm(waypoints[1:]-waypoints[:-1], axis=1).mean()
+        desired_speed = desired_speed * 2
 
         aim = waypoints[self.aim_point[cmd]]
         angle = np.degrees(np.pi / 2 - np.arctan2(aim[1], aim[0])) / 90
