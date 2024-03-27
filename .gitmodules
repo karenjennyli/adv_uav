@@ -4,5 +4,5 @@
 	branch = leaderboard
 [submodule "leaderboard"]
 	path = leaderboard
-	url = git@github.com:carla-simulator/leaderboard.git
-	branch = stable
+	url = https://github.com/karenjennyli/adversarial-leaderboard.git
+	branch = main
