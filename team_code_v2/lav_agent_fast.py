@@ -238,6 +238,17 @@ class LAVAgent(AutonomousAgent):
 
         cur_lidar = self.preprocess(cur_lidar)
 
+        '''
+        EXPERIMENT: set cur_lidar to all 0s
+        cur_lidar dimensions: torch.Size([31830, 4])
+        '''
+        # cur_lidar = torch.zeros_like(cur_lidar)
+
+        '''
+        EXPERIMENT: set cur_lidar to all 1s
+        '''
+        # cur_lidar = torch.ones_like(cur_lidar)
+
         # Paint the lidars
         rgbs = []
 
@@ -253,8 +264,104 @@ class LAVAgent(AutonomousAgent):
         tel_rgb = tel_rgb[:-self.crop_tel_bottom]
 
         all_rgbs = torch.tensor(all_rgb).permute(0,3,1,2).float().to(self.device)
+        '''
+        EXPERIMENT: set all_rgbs to all 0s
+        all_rgbs dimensions: torch.Size([3, 3, 288, 256])
+        '''
+        # all_rgbs = torch.zeros_like(all_rgbs)
+
+        '''
+        SAVE RGBS
+        '''
+        def save_rgbs():
+            if self.num_frames % 30 == 0:
+                import matplotlib.pyplot as plt
+                matplotlib.use('Agg')
+                all_rgbs_cpu = all_rgbs.cpu()
+                all_rgbs_numpy = all_rgbs_cpu.numpy()
+                for i in range(all_rgbs_numpy.shape[0]):
+                    plt.figure()
+                    plt.imshow(all_rgbs_numpy[i].transpose(1, 2, 0) / 255.0)
+                    plt.axis('off')
+                    # save to ~/adv_uav/results/rgb_images as pred_sem_{i}_{self.num_frames}.png
+                    # create the directory if it doesn't exist
+                    directory = os.path.expanduser('~/adv_uav/results/rgb_images')
+                    if not os.path.exists(directory):
+                        os.makedirs(directory)
+                    plt.savefig(f'{directory}/pred_sem_{i}_{self.num_frames}.png')
+        # save_rgbs()
+        
         pred_sem = torch.softmax(self.seg_model(all_rgbs), dim=1)
 
+        '''
+        SAVE PRED_SEM
+        '''
+        def save_pred_sem():
+            if self.num_frames % 30 == 0:
+                import matplotlib.pyplot as plt
+                import numpy as np
+                plt.switch_backend('Agg')  # Use non-interactive backend
+                pred_sem_cpu = pred_sem.cpu().numpy()
+
+                # Define colors for each class
+                class_colors = {
+                    0: [0, 0, 0],         # Background (Black)
+                    1: [255, 0, 0],       # Pedestrians (Red)
+                    2: [0, 255, 0],       # Lane Markings (Green)
+                    3: [0, 0, 255],       # Roads (Blue)
+                    4: [255, 255, 0],     # Vehicles (Yellow)
+                }
+
+                for i in range(pred_sem_cpu.shape[0]):
+                    pred_sem_img = np.zeros((pred_sem_cpu.shape[2], pred_sem_cpu.shape[3], 3), dtype=np.uint8)
+                    for row in range(pred_sem_cpu.shape[2]):
+                        for col in range(pred_sem_cpu.shape[3]):
+                            pred_sem_img[row, col] = class_colors[np.argmax(pred_sem_cpu[i, :, row, col])]
+                    plt.figure()
+                    plt.imshow(pred_sem_img)
+                    plt.axis('off')
+                    # save to ~/adv_uav/results/semseg_images as pred_sem_{i}_{self.num_frames}.png
+                    # create the directory if it doesn't exist
+                    directory = os.path.expanduser('~/adv_uav/results/semseg_images')
+                    if not os.path.exists(directory):
+                        os.makedirs(directory)
+                    plt.savefig(f'{directory}/pred_sem_{i}_{self.num_frames}.png')
+        # save_pred_sem()
+
+        '''
+        EXPERIMENT: set pred_sem to all 0s
+        pred_sem dimensions: torch.Size([3, 5, 288, 256])
+        '''
+        pred_sem = torch.zeros_like(pred_sem)
+
+        '''
+        EXPERIMENT: set one of the cameras in pred_sem to all 0s
+        '''
+        # pred_sem[0] = torch.zeros_like(pred_sem[0])
+        # pred_sem[1] = torch.zeros_like(pred_sem[1])
+        # pred_sem[2] = torch.zeros_like(pred_sem[2])
+        
+        '''
+        EXPERIMENT: set pred_sem to all 1s
+        '''
+        # pred_sem = torch.ones_like(pred_sem)
+
+        '''
+        EXPERIMENT: set pred_sem all to 0s except for one class
+        '''
+        pred_sem = torch.zeros_like(pred_sem)
+        # predict everything as background
+        # pred_sem[:,0] = torch.ones_like(pred_sem[:,0])
+        # predict everything as pedestrians
+        # pred_sem[:,1] = torch.ones_like(pred_sem[:,1])
+        # predict everything as lane markings
+        # pred_sem[:,2] = torch.ones_like(pred_sem[:,2])
+        # predict everything as roads
+        # pred_sem[:,3] = torch.ones_like(pred_sem[:,3])
+        # predict everything as vehicles
+        # pred_sem[:,4] = torch.ones_like(pred_sem[:,4])
+
+        # dimensions: torch.Size([31830, 8])
         fused_lidar = self.infer_model.forward_paint(cur_lidar, pred_sem)
 
         # EKF updates and bookeepings
@@ -313,6 +420,8 @@ class LAVAgent(AutonomousAgent):
         other_cast_cmds = to_numpy(other_cast_cmds)
 
         pred_bra = self.bra_model(rgbs, tel_rgbs)
+        # print pred_bra
+        # print("pred_bra: {:.3f}".format(pred_bra.item()))
 
         if cmd_value in [4,5]:
             ego_plan_locs = ego_cast_locs
@@ -329,7 +438,7 @@ class LAVAgent(AutonomousAgent):
 
         self.ekf.step(spd, steer, *gps[:2], compass-math.pi/2)
 
-        if float(pred_bra) > 1:
+        if float(pred_bra) > 0.1:
             throt, brake = 0, 1
         elif self.plan_collide(ego_plan_locs, other_cast_locs, other_cast_cmds):
             throt, brake = 0, 1
@@ -349,6 +458,7 @@ class LAVAgent(AutonomousAgent):
         if len(self.vizs) >= 12000:
             self.flush_data()
 
+        print(f'steer: {steer:.3f} throttle: {throt:.3f} brake: {brake:.3f}')
         return carla.VehicleControl(steer=steer, throttle=throt, brake=brake)
 
 
